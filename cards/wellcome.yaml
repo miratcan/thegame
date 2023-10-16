@@ -1,0 +1,8 @@
+text: Wellcome commander, do you want me to teach the game?
+left:
+  emit:
+    - ['add_cards_to_deck', ['first_cards']] 
+  story: Commander was brave, and wanted to jump into the duty.
+right:
+  emit:
+    - ['set_next_card', ['teach_1']]
