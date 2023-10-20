@@ -33,33 +33,48 @@ def _print_obj(obj, *keys):
 
 
 class Box:
-    def __init__(self, dir='h', name=None, parent=None, gap=None):
-        self.name = name
-        self.dir = dir
-        self.parent = parent
-        self.gap = gap
-        self.slots = []
+ def __init__(
+  slf,              # Self
+  dir='h',          # Direction
+  nme=None,         # Name
+  pnt=None,         # Anchestor
+  wth=None,         # Width (None: Auto)
+  hgt=None,         # Height (None: Auto)
+  gap=0,            # Gap
+  pwt=None,         # Padding width 
+  bwt=None,         # Border width
+  mwt=None          # Margin width
+ ):
+  pwt = pwt or [0, 0, 0, 0]
+  bwt = bwt or [0, 0, 0, 0]
+  mwt = mwt or [0, 0, 0, 0]
+  for key in ('dur', 'nme', 'pnt', 'gap', 'pwt',
+              'bwt', 'mwt'):
+   setattr(s, key, locals()[key])
+  self.slts = []
 
-    def _slot_count(self, axis):
-        if axis != self.dir:
-            return 1
-        return len(self.slots)
+  def _slot_cnt(s, axs): # Slot Count
+   # If box is horizontal, and asked for vertical
+   # slot count, it always 1.
+   if axs != self.dir: return 1
+   return len(self.slts)
 
-    def _size(self, axis):
-        if not self.parent:
-            return {HORIZONTAL: 240, VERTICAL: 136}[axis]
-        parent_slot_count = self.parent._slot_count(axis)
-        return self.parent._size(axis) / parent_slot_count
+  def _size(self, a):
+   if not self.s:
+    return {HORIZONTAL: 240, VERTICAL: 136}[axis]
+   parent_slot_count = self.parent._slot_count(axis)
+   return self.parent._size(axis) / parent_slot_count
 
     def _pos(self, axis):
         """
         x parent.size 320
         """
         index = 0
-        if axis == self.parent.dir:
+        if axis == self.parent.d:
             index = self.index
         multiplier = self.parent._size(axis) / self.parent._slot_count(axis)
-        return multiplier * index
+        trace(self.gap)
+        return (multiplier * index) + self.parent.gap
 
     def _slot_index(self, box):
         return self.slots.index(box)
@@ -101,12 +116,14 @@ class Box:
             slot.render()
 
 
-screen = Box()
+screen = Box(gap=20)
 
 left_panel = Box(name='Left Panel')
+left_panel2 = Box(name='Left Panel')
 right_panel = Box(name='Right Panel')
 
 screen.append(left_panel)
+screen.append(left_panel2)
 screen.append(right_panel)
 
 
