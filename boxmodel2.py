@@ -2,6 +2,7 @@
 HORIZONTAL, VERTICAL = 'H', 'V'
 FIXED, HUG, FILL = 'F', 'H', 'F'
 
+
 screen = Box.from_dict({
     'direction': VERTICAL,
     'sizing': (FILL, FILL),
