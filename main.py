@@ -1,32 +1,43 @@
 import pyxel
-from libs.boxer import Box, FIXED, FILL, VERTICAL
+from libs.boxer import Box, FIXED, FILL, VERTICAL, HORIZONTAL
 
 screen = Box(
     name='screen',
     width=320,
     height=240,
-    size_method=(FIXED, FIXED),
     padding=[10, 10, 10, 10]
 )
 
 screen\
     .add_child(
         'left_panel',
-        size_method=(FIXED, FILL),
         width=100,
-        margin=[5, 5, 5, 5],
-        padding=[5, 5, 5, 5]
+        height=FILL,
+        padding=[10, 10, 10, 10]
     ).add_sibling(
         'right_panel',
-        size_method=(FILL, FILL),
-        margin=[5, 5, 5, 5]
+        width=FILL,
+        height=FILL,
+        padding=[10, 10, 10, 10],
+        direction=VERTICAL
     )
+
+for name in ['x', 'y', 'z', 't'][:4]:
+    screen.right_panel.add_child(name, FILL, FILL, margin=[10, 10, 10, 10])
 
 
 def render_box(box, color):
-    pyxel.rect(*list(box.full_box) + [15-color,])
-    pyxel.rect(*list(box.content_box) + [color,])
-    pyxel.text(*list(box.content_box)[:2], box.name or 'Box', 15-color)
+    if box.name == 'y':
+        # import ipdb; ipdb.set_trace()
+        pass
+
+    x, y, w, h = box.get_bounding_box(inner_level=0)
+    pyxel.rectb(x, y, w, h, 15)
+    pyxel.text(x+2, y+2, box.name, 15-color)
+    x, y, w, h = box.get_bounding_box(inner_level=3)
+    pyxel.rect(x, y, w, h, color)
+    for child in box.children.values():
+        render_box(child, color + 1)
 
 
 class App:
@@ -40,8 +51,7 @@ class App:
     def draw(self):
         pyxel.cls(0)
 
-        render_box(screen, 1)
-        render_box(screen.left_panel, 3)
-        render_box(screen.right_panel, 5)
+        render_box(screen, 3)
+
 
 App()

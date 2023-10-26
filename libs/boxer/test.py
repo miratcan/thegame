@@ -1,217 +1,206 @@
 from . import Box, HUG, FILL, FIXED, HORIZONTAL, VERTICAL
+from itertools import product
 
 
 def test_size_method():
-    for h_sizing_method in (HUG, FILL, FIXED):
-        for v_sizing_method in (HUG, FILL, FIXED):
-            box = Box(
-                size_method=(h_sizing_method, v_sizing_method),
-                width=100,
-                padding=[10, 10, 10, 10]
-            )
-            assert box.get_size_method(HORIZONTAL) == h_sizing_method
-            assert box.get_size_method(VERTICAL) == v_sizing_method
-
-
-def test_get_padding():
     box = Box()
-    assert box.get_padding(HORIZONTAL) == 0
-    assert box.get_padding(VERTICAL) == 0
+    assert box._get_size_method(HORIZONTAL) == HUG
+    assert box._get_size_method(VERTICAL) == HUG
 
-    box = Box(padding=[1, 2, 3, 4])
-    assert box.get_padding(HORIZONTAL) == 6
-    assert box.get_padding(VERTICAL) == 4
+    box = Box(width=100, height=HUG)
+    assert box._get_size_method(HORIZONTAL) == FIXED
+    assert box._get_size_method(VERTICAL) == HUG
 
-
-def test_get_margin():
-    box = Box()
-    assert box.get_margin(HORIZONTAL) == 0
-    assert box.get_margin(VERTICAL) == 0
-
-    box = Box(margin=[1, 2, 3, 4])
-    assert box.get_margin(HORIZONTAL) == 6
-    assert box.get_margin(VERTICAL) == 4
+    box = Box(width=FILL, height=HUG)
+    assert box._get_size_method(HORIZONTAL) == FILL
+    assert box._get_size_method(VERTICAL) == HUG
 
 
-def test_get_border():
-    box = Box()
-    assert box.get_border(HORIZONTAL) == 0
-    assert box.get_border(VERTICAL) == 0
-
-    box = Box(border=[1, 2, 3, 4])
-    assert box.get_border(HORIZONTAL) == 6
-    assert box.get_border(VERTICAL) == 4
-
-
-def test_get_content_width():
-    # Content must be narrowed by padding.
-    box = Box(size_method=(FIXED, FIXED), width=20, height=20,
-              padding=[1, 2, 3, 4])
-    assert box.content_width == 14
+def test_get_width_methods():
+    frame = [1, 2, 3, 4]
+    frame_types = ['padding', 'border', 'margin']
+    methods = ['_get_%s_width' % s for s in frame_types]
+    for frame_type, method in zip(frame_types, methods):
+        box = Box()
+        assert getattr(box, method)(HORIZONTAL) == 0
+        assert getattr(box, method)(VERTICAL) == 0
+        setattr(box, frame_type, frame)
+        assert getattr(box, method)(HORIZONTAL) == 6
+        assert getattr(box, method)(VERTICAL) == 4
 
 
-def test_get_client_width():
-    # Client width must not changed with padding.
-    box = Box(size_method=(FIXED, FIXED), width=10, height=20,
-              padding=[1, 2, 3, 4])
-    assert box.client_width == 10
+def test_get_fixed_size():
+    margin = [1, 2, 3, 4]
+    border = [5, 6, 7, 8]
+    padding = [9, 10, 11, 12]
+    box = Box(width=100, height=100, margin=margin, border=border,
+              padding=padding)
+
+    # Raw
+    assert box._get_size(HORIZONTAL) == 100
+    assert box._get_size(VERTICAL) == 100
+
+    # Reduce margin
+    assert box._get_size(HORIZONTAL, inner_level=1) == 94
+    assert box._get_size(VERTICAL, inner_level=1) == 96
+
+    # Reduce border
+    assert box._get_size(HORIZONTAL, inner_level=2) == 80
+    assert box._get_size(VERTICAL, inner_level=2) == 84
+
+    # Reduce padding
+    assert box._get_size(HORIZONTAL, inner_level=3) == 58
+    assert box._get_size(VERTICAL, inner_level=3) == 64
 
 
-def test_get_offset_width():
-    # Border size must be added to the width.
-    box = Box(size_method=(FIXED, FIXED), width=10, height=20,
-              padding=[1, 2, 3, 4], border=[1, 2, 3, 4])
-    assert box.offset_width == 16
+def test_get_hugged_size():
+    margin = [1, 2, 3, 4]
+    border = [5, 6, 7, 8]
+    padding = [9, 10, 11, 12]
+
+    parent = Box(margin=[10, 10, 10, 10], padding=[10, 10, 10, 10],
+                 border=[10, 10, 10, 10])
+    parent.add_child('child', width=100, height=100, margin=margin,
+                     border=border, padding=padding)
+
+    # Raw
+    assert parent._get_size(HORIZONTAL) == 160
+    assert parent._get_size(VERTICAL) == 160
+
+    # Reduce margin
+    assert parent._get_size(HORIZONTAL, inner_level=1) == 140
+    assert parent._get_size(VERTICAL, inner_level=1) == 140
+
+    # Reduce border
+    assert parent._get_size(HORIZONTAL, inner_level=2) == 120
+    assert parent._get_size(VERTICAL, inner_level=2) == 120
+
+    # Reduce padding
+    assert parent._get_size(HORIZONTAL, inner_level=3) == 100
+    assert parent._get_size(VERTICAL, inner_level=3) == 100
 
 
-def test_get_full_width():
-    # Border size must be added to the width.
-    box = Box(size_method=(FIXED, FIXED), width=10, height=20,
-              padding=[1, 2, 3, 4], border=[1, 2, 3, 4],
-              margin=[10, 10, 10, 10])
-    assert box.full_width == 36
-
-
-def test_hug_content_width():
-    """Width of the HUG sized element must be sum of width, border
-    and margins of the children."""
-    parent = Box(size_method=(HUG, HUG))
-    parent.add_child(
-        name='child_1',
-        size_method=(FIXED, FIXED),
-        width=10,
-        height=10,
-        padding=[1, 2, 3, 4],
-        margin=[1, 2, 3, 4]
-    )   # 16
-    parent.add_child(
-        name='child_2',
-        size_method=(FIXED, FIXED),
-        width=10,
-        height=10,
-        margin=[10, 10, 10, 10]
-    )  # 30
-    assert parent.content_width == 46  # 30 + 16
-
-
-def test_hug_content_width_nested():
-    """Same test with above, but 2 levels."""
-    parent = Box(name='parent', size_method=(HUG, HUG))
+def test_hugged_size_nested():
+    parent = Box(name='parent')
     parent\
         .add_child(
             name='left_panel',
-            size_method=(HUG, HUG)
         )\
         .add_child(
-            name='left_panel_item_1',
-            size_method=(FIXED, FIXED),
-            width=20
+            name='left_panel_item_1', width=20, height=20
         )\
         .add_sibling(
-            name='left_panel_item_2',
-            size_method=(FIXED, FIXED),
-            width=20
+            name='left_panel_item_2', width=20, height=20
         )
     parent\
         .add_child(
-            name='right_panel',
-            size_method=(HUG, HUG)
+            name='right_panel', width=HUG, height=HUG
         )\
         .add_child(
-            name='right_panel_item_1',
-            size_method=(FIXED, FIXED),
-            width=20
+            name='right_panel_item_1', width=20, height=20
         )\
         .add_sibling(
-            name='right_panel_item_2',
-            size_method=(FIXED, FIXED),
-            width=20)
-
-    assert parent.content_width == 80
-
-
-def test_fill_content_width():
-    parent = Box(name='parent', size_method=(FIXED, FIXED),
-                 width=400, height=400)
-    parent\
-        .add_child(
-            name='left_child',
-            size_method=(FIXED, FILL),
-            width=100, margin=[10, 10, 10, 10]
-        ).add_sibling(
-            name='right_child',
-            size_method=(FILL, FILL)
+            name='right_panel_item_2', width=20, height=20
         )
-    assert parent.right_child.content_width == 280
+    assert parent._get_size(HORIZONTAL) == 80
+
+
+def test_get_fill_size():
+    margin = [1, 2, 3, 4]
+    border = [5, 6, 7, 8]
+    padding = [9, 10, 11, 12]
+    parent = Box(
+        margin=[10, 10, 10, 10], padding=[10, 10, 10, 10],
+        border=[10, 10, 10, 10], width=100, height=100
+    )
+    child = parent.add_child(
+        'child', width=FILL, height=FILL, margin=margin,
+        border=border, padding=padding
+    )
+    assert child._get_size(HORIZONTAL) == 40
+    assert child._get_size(VERTICAL) == 40
 
 
 def test_fill_content_width_with_shareholders():
-    parent = Box(name='parent', size_method=(FIXED, FIXED),
-                 width=400, height=400)
+    parent = Box(
+        margin=[10, 10, 10, 10], padding=[10, 10, 10, 10],
+        border=[10, 10, 10, 10], width=300, height=300
+    )
     parent\
         .add_child(
             name='left_child',
-            size_method=(FIXED, FILL),
-            width=100,
+            width=100, height=FILL,
             margin=[10, 10, 10, 10]
         ).add_sibling(
             name='right_child_1',
-            size_method=(FILL, FILL)
+            width=FILL, height=FILL
         ).add_sibling(
             name='right_child_2',
-            size_method=(FILL, FILL)
+            width=FILL, height=FILL
         )
-    assert parent.right_child_1.content_width == 140
-    assert parent.right_child_2.content_width == 140
+    assert parent.right_child_1._get_size(HORIZONTAL) == 70
+    assert parent.right_child_2._get_size(VERTICAL) == 240
 
 
-def test_previous_siblings_list():
-    parent = Box('parent')
-    child_1 = parent.add_child('child_1')
-    child_2 = parent.add_child('child_2')
-    child_3 = parent.add_child('child_3')
-    assert child_2.previous_siblings_list == [child_1]
-    assert child_3.previous_siblings_list == [child_1, child_2]
-
-
-def test_get_start_pos():
-    parent = Box(name='parent', size_method=(FIXED, FIXED),
-                 width=400, height=400, padding=[1, 2, 3, 4])
-    parent.add_child(
-        name='child',
-        size_method=(FIXED, FILL),
-        width=100, margin=[10, 10, 10, 10]
+def test_get_pos():
+    parent = Box(
+        name='parent', width=400, height=400, padding=[1, 2, 3, 4]
     )
-    assert parent.get_start_pos(HORIZONTAL) == 0
-    assert parent.get_start_pos(VERTICAL) == 0
-    assert parent.child.get_start_pos(HORIZONTAL) == 4
-    assert parent.child.get_start_pos(VERTICAL) == 2
-
-
-def test_get_start_pos_nested():
-    parent = Box(name='parent', size_method=(FIXED, FIXED),
-                 width=400, height=400, padding=[1, 2, 3, 4])
-    parent.add_child(
-        name='child_1',
-        size_method=(FIXED, FILL),
-        width=100, margin=[10, 10, 10, 10]
+    child = parent.add_child(
+        name='child', width=100, height=FILL, margin=[10, 10, 10, 10],
+        border=[10, 10, 10, 10], padding=[10, 10, 10, 10]
     )
-    parent.add_child(
-        name='child_2',
-        size_method=(FILL, FILL),
-        margin=[10, 10, 10, 10]
-    )
-    assert parent.child_2.get_start_pos(HORIZONTAL) == 124
-    assert parent.child_2.get_start_pos(VERTICAL) == 2
+    assert parent.x == 0
+    assert parent.y == 0
+
+    assert child._get_pos(HORIZONTAL, inner_level=0) == 4
+    assert child._get_pos(HORIZONTAL, inner_level=1) == 14
+    assert child._get_pos(HORIZONTAL, inner_level=2) == 24
+
+    assert child._get_pos(VERTICAL, inner_level=0) == 1
+    assert child._get_pos(VERTICAL, inner_level=1) == 11
+    assert child._get_pos(VERTICAL, inner_level=2) == 21
 
 
-def test_full_box():
-    parent = Box(name='parent', size_method=(FIXED, FIXED),
-                 width=400, height=400, padding=[1, 2, 3, 4])
-    parent.add_child(
-        name='child',
-        size_method=(FIXED, FILL),
-        width=100, margin=[10, 10, 10, 10]
+def test_get_pos_nested():
+    parent = Box(
+        name='parent', width=400, height=400,
+        padding=[1, 2, 3, 4]
     )
-    assert parent.full_box == (0, 0, 400, 400)
-    assert parent.child.full_box == (4, 2, 120, 396)
+    child_1 = parent.add_child(
+        name='child_1', width=100, height=100,
+        margin=[10, 10, 10, 10], border=[10, 10, 10, 10],
+        padding=[10, 10, 10, 10]
+    )
+    child_2 = parent.add_child(
+        name='child_2', width=FILL, height=FILL,
+        margin=[10, 10, 10, 10], border=[10, 10, 10, 10],
+        padding=[10, 10, 10, 10]
+    )
+
+    assert child_1._get_pos(HORIZONTAL, inner_level=0) == 4
+    assert child_1._get_pos(HORIZONTAL, inner_level=1) == 14
+    assert child_1._get_pos(HORIZONTAL, inner_level=2) == 24
+    assert child_1._get_pos(HORIZONTAL, inner_level=3) == 34
+    assert child_2._get_pos(HORIZONTAL, inner_level=0) == 104
+    assert child_2._get_pos(HORIZONTAL, inner_level=1) == 114
+    assert child_2._get_pos(HORIZONTAL, inner_level=2) == 124
+    assert child_2._get_pos(HORIZONTAL, inner_level=3) == 134
+
+    assert child_1._get_pos(VERTICAL, inner_level=0) == 1
+    assert child_1._get_pos(VERTICAL, inner_level=1) == 11
+    assert child_1._get_pos(VERTICAL, inner_level=2) == 21
+    assert child_1._get_pos(VERTICAL, inner_level=3) == 31
+    assert child_2._get_pos(VERTICAL, inner_level=0) == 1
+    assert child_2._get_pos(VERTICAL, inner_level=1) == 11
+    assert child_2._get_pos(VERTICAL, inner_level=2) == 21
+    assert child_2._get_pos(VERTICAL, inner_level=3) == 31
+
+
+def test_get_box():
+    box = Box(width=100, height=100, margin=[10, 10, 10, 10],
+              border=[10, 10, 10, 10], padding=[10, 10, 10, 10])
+    assert box.get_bounding_box(inner_level=0) == (0, 0, 100, 100)
+    assert box.get_bounding_box(inner_level=1) == (10, 10, 80, 80)
+    assert box.get_bounding_box(inner_level=2) == (20, 20, 60, 60)
+    assert box.get_bounding_box(inner_level=3) == (30, 30, 40, 40)
