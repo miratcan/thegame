@@ -2,6 +2,7 @@ import pyxel
 from libs.boxer import Box, FILL, VERTICAL, HORIZONTAL
 
 screen = Box('screen', 320, 240, direction=VERTICAL)
+screen.render = lambda x, y, w, h: pyxel.rect(x, y, w, h, 1)
 
 screen\
     .add_child('header', FILL, 22, direction=HORIZONTAL, padding=[5, 0, 0, 0])\
@@ -16,16 +17,18 @@ class Indicator(Box):
         super().__init__(name, FILL, FILL, margin=[0, 5, 0, 5])
 
     def render(self, x, y, w, h):
-        pyxel.text(x, y, self.title, 8)
+        pyxel.text(x, y - 1, self.title, 0)
+        pyxel.text(x, y, self.title, 12)
         pyxel.rectb(x, y + 8, w, h - 8, 3)
-        pyxel.rect(x+1, y + 9, (w / 100 * self.value) - 2, h - 10, 4)
+        pyxel.rect(x+1, y + 9, w - 2, h - 10, 0)
+        pyxel.rect(x+1, y + 9, (w / 100 * self.value) - 2, h - 10, 3)
 
 
 screen.header.add_child_obj(
-    Indicator('health', 'Health', 30),
-    Indicator('food', 'Food', 22),
-    Indicator('army', 'Army', 85),
-    Indicator('religion', 'Religion', 100)
+    Indicator('health', 'HEALTH', 30),
+    Indicator('food', 'FOOD', 22),
+    Indicator('army', 'ARMY', 85),
+    Indicator('religion', 'RELIGION', 100)
 )
 
 
