@@ -15,27 +15,32 @@ def attr_getter(d, key):
         return d[key]
 
 
+class Frame:
+    def __init__(self, values):
+        if isinstance(values, (list, tuple)):
+            self.sequence = values
+        else:
+            self.sequence = [values, ]
+
+    def __getitem__(self, i):
+        return self.sequence[i % len(self.sequence)]
+
+
 class Box(object):
-    def __init__(
-        self,
-        name=None,
-        width=HUG,
-        height=HUG,
-        padding=[0, 0, 0, 0],
-        margin=[0, 0, 0, 0],
-        border=[0, 0, 0, 0],
-        parent=None,
-        direction=HORIZONTAL
-    ):
+    def __init__(self, name=None, width=HUG, height=HUG, padding=[0, 0, 0, 0],
+                 margin=[0, 0, 0, 0], border=[0, 0, 0, 0], parent=None,
+                 direction=HORIZONTAL):
         self.name = name
         self.width = width
         self.height = height
-        self.padding = padding
-        self.margin = margin
-        self.border = border
+        self.padding = Frame(padding)
+        self.margin = Frame(margin)
+        self.border = Frame(border)
         self.parent = parent
         self.direction = direction
         self.children = {}
+        self.bg_renderer = None
+        self.fg_renderer = None
 
     def __repr__(self):
         if self.name:
@@ -61,6 +66,12 @@ class Box(object):
         self.parent.children[name] = Box(name, *args, **kwargs,
                                          parent=self.parent)
         return self.parent.children[name]
+
+    def get_root(self):
+        root = self
+        while root.parent:
+            root = root.parent
+        return root
 
     @property
     def siblings(self):
@@ -178,11 +189,12 @@ class Box(object):
         )
 
     def _render(self):
-        print('render:', self.name)
-        x, y, w, h = self.get_bounding_box(inner_level=3)
-        self.render(x, y, w, h)
+        if self.bg_renderer:
+            x, y, w, h = self.get_bounding_box(inner_level=2)
+            self.bg_renderer(self, x, y, w, h)
+
+        if self.fg_renderer:
+            x, y, w, h = self.get_bounding_box(inner_level=3)
+            self.fg_renderer(self, x, y, w, h)
         for child in self.children.values():
             child._render()
-
-    def render(self, x, y, w, h):
-        pass
