@@ -49,7 +49,13 @@ class Box(object):
 
     def add_child(self, name, *args, **kwargs):
         self.children[name] = Box(name, *args, **kwargs, parent=self)
+        self.children[name].parent = self
         return self.children[name]
+
+    def add_child_obj(self, *objs):
+        for obj in objs:
+            obj.parent = self
+            self.children[obj.name] = obj
 
     def add_sibling(self, name, *args, **kwargs):
         self.parent.children[name] = Box(name, *args, **kwargs,
@@ -170,3 +176,13 @@ class Box(object):
             self._get_size(HORIZONTAL, inner_level),
             self._get_size(VERTICAL, inner_level)
         )
+
+    def _render(self):
+        print('render:', self.name)
+        x, y, w, h = self.get_bounding_box(inner_level=3)
+        self.render(x, y, w, h)
+        for child in self.children.values():
+            child._render()
+
+    def render(self, x, y, w, h):
+        pass
