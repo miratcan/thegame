@@ -2,24 +2,34 @@
 -- author:  game developer, email, etc.
 -- desc:    short description
 -- site:    website link
--- license: MIT License (change this to your license of choice)
+-- license: MIT License 
 -- version: 0.1
 -- script:  lua
 
 local H = 'H' -- Horizontal
-local V = 'H' -- Vertical
+local V = 'V' -- Vertical
 local FX --..... Fixed Size
 local FL --..... Auto Fill 
 
+local min = math.min
+local max = math.max
 -- Frame class ----------------------
+-- Define the class table
 local F = {}
 
-function F.n(v)
- return setmetatable({ s = v }, F)
+function F.n(t, r, b, l)
+ local instance = { t, r, b, l }
+ setmetatable(instance, F)
+ F.__index = F
+ return instance
 end
 
-F.__index = function(self, i)
- return self.s[i % #self.s + 1]
+function F.w(self, a)
+ if a == H then 
+  return self[2] + self[4]
+ elseif a == V then
+  return self[1] + self[3]
+ end
 end
 
 -- Box class ------------------------
@@ -27,44 +37,47 @@ end
 local B = {}
 
 function B:n(n, w, h, p, m, b, pt, d)
- self.__index = self -- WHY AMK?
+ -- Box model for the game.
+ -- It supports two sizing methods:
+ -- Fixed (FX) and Fill (FL)
+ self.__index = self
  return setmetatable({
   n   = n, --...... Name
-  w   = w, --...... Width
-  h   = h, --...... Height
-  p   = F.n(p),--.. Padding Width
+  w   = w or FL,--. Width
+  h   = h or FL,--. Height
   m   = F.n(m),--.. Margin Width
   b   = F.n(b),--.. Border Width
+  p   = F.n(p),--.. Padding Width
   pt  = pt, --..... Parent
   d   = d, --...... Direction
   chn = {}, --..... Chilren
+  chni= {}, --..... Children indexes
   bgr = nil, --.... Background render
   fgr = nil --..... Foreground render
  }, B)
 end
 
+function B.aco(self, o)
+ -- Append previously instantinated 
+ -- box object.
+ o.pt = self
+	self.chn[o.n] = o 
+ table.insert(self.chni, o)
+ return o
+
+end
+
 function B.ac(self, name, ...)
  -- Append child box by providing
  -- params.
- self.chn[name] = B:n(name, ...)
- self.chn[name].pt = self
- return self.chn[name]
-end
-
-function B.aco(self, ...)
- -- Append previously instantinated 
- -- box object.
- for _, o in ipairs{...} do
-  o.pt = self
-  self.chn[o.n] = o
-  return o
- end
+ local o = B:n(name, ...)
+ return self:aco(o)
 end
 
 function B.as(self, name, ...)
  -- Append sibling by providing 
  -- params.
- return self.parent:ac(name, ...)
+ return self.pt:ac(name, ...)
 end
 
 function B.rt(self)
@@ -76,66 +89,47 @@ function B.rt(self)
  return rt
 end
 
-function B.ss(self)
- -- Siblings of the box.
+function B.ss(self, break_on_hit)
+ -- Get sisters by creation order.
+ -- Stop at self if break_on_hit is 
+ -- true
+ break_on_hit = break_on_hit or false
  local r = {}
- for _, b in pairs(self.pt.chn) do
-  if b ~= self then
-   table.insert(r, b)
+ for i=1, #self.pt.chni do
+ 	s = self.pt.chni[i]
+  if s == self then
+   if break_on_hit then
+    break 
+   else 
+    goto continue
+   end
   end
+  table.insert(r, s)
+  ::continue::
  end
  return r
 end
 
 function B.ps(self)
  -- Previous siblings of the box.
- local r = {}
- for _, s in pairs(self.pt.chn) do
-  if s == self then
-   break
-  end
-  table.insert(r, s)
- end
- return r
+ return self:ss(true)
 end
 
 function B.gsm(self, a)
  -- Get size method on axis.
- local m = (a==H) and 'w' or 'h'
- return type(self[m]) == 'number'and
-        FX or self[m]
-end
-
-function B.gfw(f, a)
- -- Get total frame width in given 
- -- axis.
- local i=(a==H) and {1,3} or {0, 2}
- local w = 0
- for _, j in ipairs(i) do
-  w = w + f[j + 1]
+ local m = (a == H) and 'w' or 'h'
+ local v = self[m]
+ if type(v) == 'number' then
+ 	return FX
+ else
+  return FL
  end
- return w
-end
-
-function B.gpw(self, a)
- -- Get padding width in given axis.
- return self:gfw(a, self.p)
-end
-
-function B.gmw(self, a)
- -- Get margin width in given axis.
- return self:gfw(a, self.m)
-end
-
-function B.gbw(self, a)
- -- Get border width in given axis.
- return self:gfw(a, self.b)
 end
 
 function B.gas(self, a)
  -- Get available space to expand
  -- in given axis.
- local c = self.pt:_gs(a, 3)
+ local c = self.pt:gs(a, 3)
  local nfs = {}
  for _, b in pairs(self:ss()) do
   if b:gsm(a) ~= F then
@@ -149,11 +143,29 @@ function B.gas(self, a)
  return c - ss
 end
 
-function B.r(self) 
- if self.r_bg ~= nil then
-  x, y, w, h = self.get_
+function B.gs(self, a)
+	trace(self.w)
+ local sm = self:gsm(a)
+ if sm == FX then
+  local attr = a == H and 'w' or 'h'
+  return self[attr]
+ elseif sm == FL then
+  assert(self.pt ~= nil)
+  local as = self:gas(axis)
+  local nos = 0 -- num of shares
+  for i=1, i >= #self.pt.chni do 
+   c = self.pt.chni[i]
+   if c:gsm(axis) == FL then
+    nos = nos + 1
+   end
+  end
+  if self.pt.d == a then
+   return floor(as / nos)
+  end
+  return as
  end
 end
+
 
 local testRunner = {
  tests = {
@@ -167,10 +179,46 @@ local testRunner = {
    assert(scr.chn.bdy.n == 'bdy')
   end,
   test_gsm = function()
-  	local scr = B:n('scr')
-   assert(scr.gsm(H) == 'FL')
+   local scr = B:n('scr')
+   assert(scr.gsm(H) == FL)
+   scr.width = 10
+   assert(scr.gsm(H) == FX)
   end,
-  test_zoo = function()
+  test_ps = function()
+   local pt = B:n('pt')
+   pt:ac('c1'):as('c2'):as('c3')
+   assert(#pt.chn.c1:ps() == 0)
+   assert(#pt.chn.c2:ps() == 1)
+   assert(#pt.chn.c3:ps() == 2)
+  end,
+  test_ss= function()
+   local pt = B:n('pt')
+   pt:ac('c1'):as('c2'):as('c3')
+   assert(#pt.chn.c1:ss() == 2)
+   assert(#pt.chn.c2:ss() == 2)
+   assert(#pt.chn.c3:ss() == 2)
+  end,
+  test_f = function()
+   local f = F.n(1, 2, 3, 4)
+   assert(f[1] == 1)
+   assert(f[2] == 2)
+   assert(f[3] == 3)
+   assert(f[4] == 4)
+   assert(f:w(H) == 6)
+   assert(f:w(V) == 4)
+  end,
+  test_gs_fx = function()
+   local b = B:n('b', 100, 100)
+   assert(b:gs(H) == 100)
+   assert(b:gs(V) == 100)
+  end,
+  test_gs_fl = function()
+   local p = B:n('p', 100, 100, 5, 5)
+   local c = p:ac('c', FL, FL)
+   assert(c.n == 'c')
+   assert(c:gsm(H) == FL)
+   assert(c:gsm(V) == FL)
+   assert(c:gs(H) == 100)
   end
  },
  init = function(self)
@@ -183,7 +231,9 @@ local testRunner = {
  fail = false,
  tic = function(self)
   if self.idx <= #self._tests then
-   local n, f = table.unpack(self._tests[self.idx])
+   local n, f = table.unpack(
+    self._tests[self.idx]
+   )
    local s, e = pcall(f)
    if s then
     trace("Testing " .. n .. " passed.", 5)
