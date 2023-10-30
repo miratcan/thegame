@@ -1,4 +1,4 @@
--- title:   game title
+-- title:   game ==  == 100100 title
 -- author:  game developer, email, etc.
 -- desc:    short description
 -- site:    website link
@@ -6,31 +6,42 @@
 -- version: 0.1
 -- script:  lua
 
-local H = 'H' -- Horizontal
-local V = 'V' -- Vertical
-local FX --..... Fixed Size
-local FL --..... Auto Fill 
+local H = 'H' --..Horizontal
+local V = 'V' --..Vertical
+local FX = 'FX' --Fixed Size
+local FL = 'FL' --Auto Fill 
 
-local min = math.min
-local max = math.max
 -- Frame class ----------------------
 -- Define the class table
-local F = {}
+F = {}
 
-function F.n(t, r, b, l)
- local instance = { t, r, b, l }
- setmetatable(instance, F)
- F.__index = F
- return instance
+function F:n(t, r, b, l)
+  local o = {t, r, b, l }
+  setmetatable(o, self)
+  self.__index = self
+  return o
 end
 
-function F.w(self, a)
- if a == H then 
-  return self[2] + self[4]
- elseif a == V then
-  return self[1] + self[3]
- end
+function F.__add(f1, f2)
+  local r = F:n(0, 0, 0, 0)
+  for i = 1, 4 do
+    r[i] = f1[i] + f2[i]
+  end
+  return r
 end
+
+function F:w(a)
+  local r = 0
+  for i = 1, 4 do
+    if a == H and (i == 2 or i == 4) then
+      r = r + self[i]
+    elseif a == V and (i == 1 or i == 3) then
+      r = r + self[i]
+    end
+  end
+  return r
+end
+
 
 -- Box class ------------------------
 
@@ -45,9 +56,9 @@ function B:n(n, w, h, p, m, b, pt, d)
   n   = n, --...... Name
   w   = w or FL,--. Width
   h   = h or FL,--. Height
-  m   = F.n(m),--.. Margin Width
-  b   = F.n(b),--.. Border Width
-  p   = F.n(p),--.. Padding Width
+  m   = F:n(m),--.. Margin Width
+  b   = F:n(b),--.. Border Width
+  p   = F:n(p),--.. Padding Width
   pt  = pt, --..... Parent
   d   = d, --...... Direction
   chn = {}, --..... Chilren
@@ -61,10 +72,9 @@ function B.aco(self, o)
  -- Append previously instantinated 
  -- box object.
  o.pt = self
-	self.chn[o.n] = o 
+ self.chn[o.n] = o
  table.insert(self.chni, o)
  return o
-
 end
 
 function B.ac(self, name, ...)
@@ -91,16 +101,17 @@ end
 
 function B.ss(self, break_on_hit)
  -- Get sisters by creation order.
- -- Stop at self if break_on_hit is 
+ -- St at self if break_on_hit is 
  -- true
  break_on_hit = break_on_hit or false
  local r = {}
+ local s
  for i=1, #self.pt.chni do
  	s = self.pt.chni[i]
   if s == self then
    if break_on_hit then
-    break 
-   else 
+    break
+   else
     goto continue
    end
   end
@@ -119,53 +130,58 @@ function B.gsm(self, a)
  -- Get size method on axis.
  local m = (a == H) and 'w' or 'h'
  local v = self[m]
- if type(v) == 'number' then
- 	return FX
- else
-  return FL
- end
+ if v == FL then return FL end
+ return FX
 end
 
-function B.gas(self, a)
+function B:gas(a)
  -- Get available space to expand
  -- in given axis.
- local c = self.pt:gs(a, 3)
- local nfs = {}
- for _, b in pairs(self:ss()) do
-  if b:gsm(a) ~= F then
-   table.insert(nfs, b)
+ local r = self.pt:gis(a)
+ local ss = self.ss() -- sisters
+ for i=1, #ss do
+  local s = ss[i]
+  if s:gsm(a) == FX then
+   r = r - s:gs(a)
   end
  end
- local ss = 0
- for _, b in pairs(nfs) do
-  ss = ss + b:_gs(a)
- end
- return c - ss
+ return r
 end
 
 function B.gs(self, a)
-	trace(self.w)
  local sm = self:gsm(a)
  if sm == FX then
   local attr = a == H and 'w' or 'h'
   return self[attr]
  elseif sm == FL then
+  trace(self.pt)
   assert(self.pt ~= nil)
-  local as = self:gas(axis)
+  local as = self:gas(a)
   local nos = 0 -- num of shares
-  for i=1, i >= #self.pt.chni do 
-   c = self.pt.chni[i]
-   if c:gsm(axis) == FL then
+  for i=1, #self.pt.chni do
+   local c = self.pt.chni[i]
+   if c:gsm(a) == FL then
     nos = nos + 1
    end
   end
   if self.pt.d == a then
-   return floor(as / nos)
+   return math.floor(as / nos)
   end
   return as
  end
 end
 
+function B.gis(self, a)
+  -- Get inner size.
+ local r = self:gs(a)
+ local ms = {'m', 'b', 'p'}
+ for i=1, #ms do
+  local m = ms[i] -- Method
+  local f = self[m] -- Frame
+  r = r - f:w(a)
+ end
+ return r
+end
 
 local testRunner = {
  tests = {
@@ -173,16 +189,31 @@ local testRunner = {
    local scr = B:n('scr'):ac('hdr'):rt()
    assert(scr.n == 'scr')
    assert(scr.chn.hdr.n == 'hdr')
-  	local b = B:n('bdy')
+   local b = B:n('bdy')
    assert (b.n == 'bdy')
    scr:aco(b)
    assert(scr.chn.bdy.n == 'bdy')
   end,
-  test_gsm = function()
-   local scr = B:n('scr')
-   assert(scr.gsm(H) == FL)
-   scr.width = 10
-   assert(scr.gsm(H) == FX)
+  test_ac = function()
+   local p = B:n('p')
+   local c = p:ac('c')
+   assert(c.pt == p)
+  end,
+  test_aco = function()
+   local p = B:n('p')
+   local c = B:n('c')
+   p:aco(c)
+   assert(c.pt == p)
+  end,
+  test_gsm_fl = function()
+   local b = B:n('b')
+   assert(b:gsm(H) == FL)
+   assert(b:gsm(V) == FL)
+  end,
+  test_gsm_fx = function()
+   local b= B:n('b', 100, 100)
+   assert(b:gsm(H) == FX)
+   assert(b:gsm(V) == FX)
   end,
   test_ps = function()
    local pt = B:n('pt')
@@ -199,13 +230,14 @@ local testRunner = {
    assert(#pt.chn.c3:ss() == 2)
   end,
   test_f = function()
-   local f = F.n(1, 2, 3, 4)
+   local f = F:n(1, 2, 3, 4)
    assert(f[1] == 1)
    assert(f[2] == 2)
    assert(f[3] == 3)
    assert(f[4] == 4)
    assert(f:w(H) == 6)
    assert(f:w(V) == 4)
+   local b = B:n('test')
   end,
   test_gs_fx = function()
    local b = B:n('b', 100, 100)
@@ -213,12 +245,18 @@ local testRunner = {
    assert(b:gs(V) == 100)
   end,
   test_gs_fl = function()
-   local p = B:n('p', 100, 100, 5, 5)
-   local c = p:ac('c', FL, FL)
-   assert(c.n == 'c')
-   assert(c:gsm(H) == FL)
-   assert(c:gsm(V) == FL)
+   -- Test get fill type size
+   local p = B:n('p', 100, 100)
+   local c = p:ac('c1')
    assert(c:gs(H) == 100)
+   assert(c:gs(V) == 100)
+  end,
+  test_gs_fl_ws = function()
+   -- Test fill type size with
+   -- siblings.
+   local p = B:n('p', 100, 100)
+   local c1 = p:ac('c1')
+   assert(c1:gs(H) == 50)
   end
  },
  init = function(self)
@@ -243,7 +281,6 @@ local testRunner = {
     self.fail = true
    end 
    self.idx = self.idx + 1
-   name, func = next(self.tests)
   else
    if self.fail then
     cls(3)
