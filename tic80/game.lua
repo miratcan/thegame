@@ -16,9 +16,11 @@ local FL = 'FL' --Auto Fill
 F = {}
 
 function F:n(t, r, b, l)
-  local o = {t, r, b, l }
-  setmetatable(o, self)
+  local o = {
+  	t or 0, r or 0, b or 0, l or 0
+  }
   self.__index = self
+  setmetatable(o, self)
   return o
 end
 
@@ -52,15 +54,20 @@ function B:n(n, w, h, p, m, b, pt, d)
  -- It supports two sizing methods:
  -- Fixed (FX) and Fill (FL)
  self.__index = self
+
+ m = F:n(table.unpack(m or {0}))
+ b = F:n(table.unpack(b or {0}))
+ p = F:n(table.unpack(p or {0}))
+ 
  return setmetatable({
   n   = n, --...... Name
   w   = w or FL,--. Width
   h   = h or FL,--. Height
-  m   = F:n(m),--.. Margin Width
-  b   = F:n(b),--.. Border Width
-  p   = F:n(p),--.. Padding Width
+  m   = m,--....... Margin Width
+  b   = b,--....... Border Width
+  p   = p,--....... Padding Width
   pt  = pt, --..... Parent
-  d   = d, --...... Direction
+  d   = d or H, --. Direction
   chn = {}, --..... Chilren
   chni= {}, --..... Children indexes
   bgr = nil, --.... Background render
@@ -99,7 +106,7 @@ function B.rt(self)
  return rt
 end
 
-function B.ss(self, break_on_hit)
+function B:ss(break_on_hit)
  -- Get sisters by creation order.
  -- St at self if break_on_hit is 
  -- true
@@ -138,7 +145,7 @@ function B:gas(a)
  -- Get available space to expand
  -- in given axis.
  local r = self.pt:gis(a)
- local ss = self.ss() -- sisters
+ local ss = self:ss() -- sisters
  for i=1, #ss do
   local s = ss[i]
   if s:gsm(a) == FX then
@@ -148,15 +155,17 @@ function B:gas(a)
  return r
 end
 
-function B.gs(self, a)
+function B:gs(a)
  local sm = self:gsm(a)
  if sm == FX then
   local attr = a == H and 'w' or 'h'
   return self[attr]
  elseif sm == FL then
-  trace(self.pt)
   assert(self.pt ~= nil)
   local as = self:gas(a)
+  if self.pt.d ~= a then
+   return as
+  end
   local nos = 0 -- num of shares
   for i=1, #self.pt.chni do
    local c = self.pt.chni[i]
@@ -164,22 +173,56 @@ function B.gs(self, a)
     nos = nos + 1
    end
   end
-  if self.pt.d == a then
-   return math.floor(as / nos)
-  end
-  return as
+  return math.floor(as / nos)
  end
 end
 
-function B.gis(self, a)
-  -- Get inner size.
+function B:gis(a, l)
+ -- Get inner size.
+ local l = l or 3
  local r = self:gs(a)
  local ms = {'m', 'b', 'p'}
- for i=1, #ms do
+ for i=1, #ms[3] do
   local m = ms[i] -- Method
   local f = self[m] -- Frame
   r = r - f:w(a)
  end
+ return r
+end
+
+function B:pos(l)
+ -- Build bounding box
+ -- Only parent must call this.
+ r = {x=0, y=0}
+ if not self.pt then return r end
+
+	local ms = {'m', 'b', 'p'}
+ local p = self.pt
+
+ -- Get inner position of parent.
+ while p.pt ~= nil do
+ 	for i=1, #ms[3] do
+   local f = ms[i]
+  	r['x'] = r['x'] + p[f[4]]
+   r['y'] = r['y'] + p[f[1]]
+  end
+  p = p.pt
+ end
+ 
+ -- Add push from previous siblings
+ local pss = self:ps()
+
+ -- TODO: This can be shorter imo.
+ local k
+	if self.pt.d == H then k = 'x'
+	elseif self.pt.d == V then k = 'y'
+	else error('WTF') end
+
+ for i=1, #pss do
+ 	local ps = pss[i]
+  r[k] = r[k] + ps.gs(self.pt.a)
+ end
+
  return r
 end
 
@@ -237,6 +280,7 @@ local testRunner = {
    assert(f[4] == 4)
    assert(f:w(H) == 6)
    assert(f:w(V) == 4)
+   f = F:n()
    local b = B:n('test')
   end,
   test_gs_fx = function()
@@ -256,14 +300,27 @@ local testRunner = {
    -- siblings.
    local p = B:n('p', 100, 100)
    local c1 = p:ac('c1')
+   local c2 = p:ac('c2')
    assert(c1:gs(H) == 50)
+  end,
+  test_pos = function()
+  	local p = B:n('p', 100, 100, {10}, {10})
+   local c = p:ac('c')
+   local pos = c:pos()
+   trace(pos['x'])
+   trace(pos['y'])
   end
  },
  init = function(self)
   self._tests = {}
   for n, f in pairs(self.tests) do
+   if self.isolate and n ~= self.isolate then
+     goto continue
+   end
    table.insert(self._tests, {n, f})
+   ::continue::
   end
+  self.m = 320 / #self._tests
  end,
  idx = 1,
  fail = false,
@@ -272,6 +329,9 @@ local testRunner = {
    local n, f = table.unpack(
     self._tests[self.idx]
    )
+   cls()
+   rect(0, 0, self.idx * self.m, 1, 4)
+   print('Running Tests:' .. n, 8, 8)
    local s, e = pcall(f)
    if s then
     trace("Testing " .. n .. " passed.", 5)
@@ -297,6 +357,7 @@ local testRunner = {
 
 local READY = false
 testRunner:init()
+screen = B:n('screen', 240, 139)
 
 function TIC()
  if READY == false then
