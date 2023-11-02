@@ -49,7 +49,7 @@ end
 
 local B = {}
 
-function B:n(n, w, h, p, m, b, pt, d)
+function B:n(n, w, h, m, b, p, pt, d)
  -- Box model for the game.
  -- It supports two sizing methods:
  -- Fixed (FX) and Fill (FL)
@@ -179,7 +179,7 @@ end
 
 function B:gis(a, l)
  -- Get inner size.
- local l = l or 3
+ l  = l or 3
  local r = self:gs(a)
  local ms = {'m', 'b', 'p'}
  for i=1, #ms[3] do
@@ -193,22 +193,22 @@ end
 function B:pos(l)
  -- Build bounding box
  -- Only parent must call this.
- r = {x=0, y=0}
+ l = l or 0
+ local r = {x=0, y=0}
  if not self.pt then return r end
 
-	local ms = {'m', 'b', 'p'}
+ local ms = {'m', 'b', 'p'}
  local p = self.pt
-
  -- Get inner position of parent.
- while p.pt ~= nil do
- 	for i=1, #ms[3] do
-   local f = ms[i]
-  	r['x'] = r['x'] + p[f[4]]
-   r['y'] = r['y'] + p[f[1]]
+ repeat
+ 	for i=1, #ms do
+   local f = p[ms[i]]
+   r['x'] = r['x'] + f[4]
+   r['y'] = r['y'] + f[1]
   end
   p = p.pt
- end
- 
+ until(p == nil)
+
  -- Add push from previous siblings
  local pss = self:ps()
 
@@ -220,7 +220,7 @@ function B:pos(l)
 
  for i=1, #pss do
  	local ps = pss[i]
-  r[k] = r[k] + ps.gs(self.pt.a)
+  r[k] = r[k] + ps:gs(self.pt.d)
  end
 
  return r
@@ -281,7 +281,6 @@ local testRunner = {
    assert(f:w(H) == 6)
    assert(f:w(V) == 4)
    f = F:n()
-   local b = B:n('test')
   end,
   test_gs_fx = function()
    local b = B:n('b', 100, 100)
@@ -300,15 +299,26 @@ local testRunner = {
    -- siblings.
    local p = B:n('p', 100, 100)
    local c1 = p:ac('c1')
-   local c2 = p:ac('c2')
+   p:ac('c2')
    assert(c1:gs(H) == 50)
   end,
   test_pos = function()
-  	local p = B:n('p', 100, 100, {10}, {10})
+   local p = B:n('p', 100, 100, {10, 2, 10, 2})
    local c = p:ac('c')
    local pos = c:pos()
-   trace(pos['x'])
-   trace(pos['y'])
+   assert(pos['x'] == 2)
+   assert(pos['y'] == 10)
+  end,
+  test_pos_ws = function()
+   local p = B:n('p', 100, 100, {10, 2, 10, 2})
+   local c1 = p:ac('c1')
+   local c2 = p:ac('c2')
+   local pos = c1:pos()
+   assert(pos['x'] == 2)
+   assert(pos['y'] == 10)
+   pos = c2:pos()
+   trace(pos['x'], 12)
+   trace(pos['y'], 12)
   end
  },
  init = function(self)
