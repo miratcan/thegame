@@ -15,8 +15,8 @@ local FX = 'FX' --Fixed Size
 local FL = 'FL' --Auto Fill 
 
 
-function merge(a, b)--b:n arvot overridaa a:n
-  r = {}
+local function merge(a, b)--b:n arvot overridaa a:n
+  local r = {}
 	for k,v in pairs(b) do
     if (
       type(v)=='table'
@@ -182,21 +182,15 @@ function B:gs(a)
  elseif sm == FL then
   assert(self.pt ~= nil)
   local as = self:gas(a)
-  if self.pt.d ~= a then
-    tracE('Parent direction is ' ..self.pt.d .. 'no need to calculate previous siblings')
-    trace('Available space' .. self.n .. ':' .. a ..':'.. as)
-   return as
-  end
-  trace(self.n .. ':as:' .. a ..':'.. as)
+  trace('available space '..a..' is: '..as)
+  if self.pt.d ~= a then return as end
   local nos = 0 -- num of shares
   for i=1, #self.pt.chni do
    local c = self.pt.chni[i]
-   trace('c:' .. c.n .. ':sm:' .. c:gsm(a))
    if c:gsm(a) == FL then
     nos = nos + 1
    end
   end
-  trace('nos:' .. nos)
   return math.floor(as / nos)
  end
 end
@@ -259,6 +253,7 @@ function B:bbox(l)
  local pos = self:pos()
  local x = pos['x']
  local y = pos['y']
+ trace('calculating w of' .. self.n)
  local w = self:gs(H)
  local h = self:gs(V)
  for i=1, min(l, #ms) do
@@ -441,15 +436,24 @@ local testRunner = {
     local pt = B:n('pt', 200, 200)
     local pn = pt:ac('pn', 30, FL)
     local ct = pt:ac('ct', FL, FL, m)
-    local b1 = ct:ac('b1')
-    local b2 = ct:ac('b2')
-    local b3 = ct:ac('b3')
-    local x, y, w, h
-    x, y, w, h = unpack(b1:bbox())
+    x, y, w, h = unpack(ct:bbox(1))
     assert(x == 40)
     assert(y == 10)
     assert(w == 150)
-    assert(h == 60)
+    assert(h == 180)
+    local cti = ct:ac('cti')
+    x, y, w, h = unpack(cti:bbox(1))
+    assert(x == 40)
+    assert(y == 10)
+    assert(w == 150)
+    assert(h == 180)
+    local cti2 = ct:ac('cti2')
+    x, y, w, h = unpack(cti:bbox(1))
+    assert(x == 40)
+    assert(y == 10)
+    trace(w)
+    assert(w == 150)
+    assert(h == 180)
   end
  },
  isolate = 'test_complex_1',
