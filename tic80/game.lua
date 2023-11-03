@@ -6,10 +6,28 @@
 -- version: 0.1
 -- script:  lua
 
+min = math.min
+unpack = table.unpack
+
 local H = 'H' --..Horizontal
 local V = 'V' --..Vertical
 local FX = 'FX' --Fixed Size
 local FL = 'FL' --Auto Fill 
+
+
+function merge(a, b)--b:n arvot overridaa a:n
+  r = {}
+	for k,v in pairs(b) do
+    if (
+      type(v)=='table'
+    ) and(
+        type(a[k] or false) == table -- ???
+    ) then merge(a[k],b[k])
+    else a[k]=v
+  end end
+	return a
+end
+
 
 -- Frame class ----------------------
 -- Define the class table
@@ -58,7 +76,6 @@ function B:n(n, w, h, m, b, p, pt, d)
  m = F:n(table.unpack(m or {0}))
  b = F:n(table.unpack(b or {0}))
  p = F:n(table.unpack(p or {0}))
- 
  return setmetatable({
   n   = n, --...... Name
   w   = w or FL,--. Width
@@ -71,7 +88,9 @@ function B:n(n, w, h, m, b, p, pt, d)
   chn = {}, --..... Chilren
   chni= {}, --..... Children indexes
   bgr = nil, --.... Background render
-  fgr = nil --..... Foreground render
+  fgr = nil, --..... Foreground render
+  brc = nil, -- .... Border color
+  bgc = nil, -- .... Background color
  }, B)
 end
 
@@ -144,7 +163,7 @@ end
 function B:gas(a)
  -- Get available space to expand
  -- in given axis.
- local r = self.pt:gis(a)
+ local r = self.pt:gis(a, 3)
  local ss = self:ss() -- sisters
  for i=1, #ss do
   local s = ss[i]
@@ -164,38 +183,46 @@ function B:gs(a)
   assert(self.pt ~= nil)
   local as = self:gas(a)
   if self.pt.d ~= a then
+    tracE('Parent direction is ' ..self.pt.d .. 'no need to calculate previous siblings')
+    trace('Available space' .. self.n .. ':' .. a ..':'.. as)
    return as
   end
+  trace(self.n .. ':as:' .. a ..':'.. as)
   local nos = 0 -- num of shares
   for i=1, #self.pt.chni do
    local c = self.pt.chni[i]
+   trace('c:' .. c.n .. ':sm:' .. c:gsm(a))
    if c:gsm(a) == FL then
     nos = nos + 1
    end
   end
+  trace('nos:' .. nos)
   return math.floor(as / nos)
  end
 end
 
 function B:gis(a, l)
  -- Get inner size.
- l  = l or 3
+ l  = l or 0
  local r = self:gs(a)
  local ms = {'m', 'b', 'p'}
- for i=1, #ms[3] do
+ for i=1, min(#ms, l) do
   local m = ms[i] -- Method
   local f = self[m] -- Frame
   r = r - f:w(a)
+  print(r)
  end
  return r
 end
 
-function B:pos(l)
+function B:pos()
  -- Build bounding box
  -- Only parent must call this.
- l = l or 0
- local r = {x=0, y=0}
- if not self.pt then return r end
+
+ if not self.pt then
+    return {['x']= 0, ['y']= 0}
+ end
+ local r = self.pt:pos()
 
  local ms = {'m', 'b', 'p'}
  local p = self.pt
@@ -224,6 +251,45 @@ function B:pos(l)
  end
 
  return r
+end
+
+function B:bbox(l)
+ l = l or 0
+ local ms = {'m', 'b', 'p'}
+ local pos = self:pos()
+ local x = pos['x']
+ local y = pos['y']
+ local w = self:gs(H)
+ local h = self:gs(V)
+ for i=1, min(l, #ms) do
+  local f = self[ms[i]] -- Frame
+  x = x + f[4]
+  y = y + f[1]
+  w = w - f:w(H)
+  h = h - f:w(V)
+ end
+ return {x, y, w, h}
+end
+
+function B:render()
+  local x, y, w, h
+  -- Border bounding box
+  if self.brc then
+    x, y, w, h = unpack(self:bbox(1))
+    rect(x, y, w, h, self.brc)
+    -- print(w, x + 2, y + 2)
+  end
+  if self.bgc then
+    x, y, w, h = unpack(self:bbox(2))
+    rect(x, y, w, h, self.bgc)
+    -- print(w, x + 2, y + 2)
+  end
+  x, y, w, h = unpack(self:bbox(0))
+  -- rectb(x, y, w, h, 3)
+  print(self.n, x + 2, y + 2)
+  for i=1, #self.chni do
+    self.chni[i]:render()
+  end
 end
 
 local testRunner = {
@@ -310,17 +376,84 @@ local testRunner = {
    assert(pos['y'] == 10)
   end,
   test_pos_ws = function()
-   local p = B:n('p', 100, 100, {10, 2, 10, 2})
+   -- Margin of parent
+   local m = {10, 10, 10, 10}
+   local p = B:n('p', 100, 100, m)
    local c1 = p:ac('c1')
    local c2 = p:ac('c2')
    local pos = c1:pos()
-   assert(pos['x'] == 2)
+   -- First child is not pushed by 
+   -- a sibling.
+   assert(pos['x'] == 10)
    assert(pos['y'] == 10)
+
    pos = c2:pos()
-   trace(pos['x'], 12)
-   trace(pos['y'], 12)
+   -- c2 must be pushhed by c1
+   -- 10 from parent, 40 from c1
+   assert(pos['x']== 50)
+   assert(pos['y']==10)
+  end,
+  test_bbox = function()
+    local p = B:n('p', 100, 100)
+    local bbox = p:bbox()
+    local x, y, w, h = unpack(bbox)
+    assert(x==0)
+    assert(y==0)
+    assert(w==100)
+    assert(h==100)
+  end,
+  test_bbox_levels = function()
+    local m = {10, 10, 10, 10}
+    local b = {10, 10, 10, 10}
+    local p = {10, 10, 10, 10}
+    local bx = B:n('p', 100, 100, m, b, p)
+    -- Level 0 
+    local bbox = bx:bbox()
+    local x, y, w, h = unpack(bbox)
+    assert(x == 0)
+    assert(y == 0)
+    assert(w == 100)
+    assert(h == 100)
+    -- Level 1 (Margin reduced)
+    bbox = bx:bbox(1)
+    x, y, w, h = unpack(bbox)
+    assert(x == 10)
+    assert(y == 10)
+    assert(w == 80)
+    assert(h == 80)
+    -- Level 2 (Border reduced)
+    bbox = bx:bbox(2)
+    x, y, w, h = unpack(bbox)
+    assert(x == 20)
+    assert(y == 20)
+    assert(w == 60)
+    assert(h == 60)
+    -- Level 3 (Padding reduced)
+    bbox = bx:bbox(3)
+    x, y, w, h = unpack(bbox)
+    assert(x == 30)
+    assert(y == 30)
+    assert(w == 40)
+    assert(h == 40)
+  end,
+  test_complex_1 = function()
+    local m = F:n(10, 10, 10, 10)
+    local pt = B:n('pt', 200, 200)
+    local pn = pt:ac('pn', 30, FL)
+    local ct = pt:ac('ct', FL, FL, m)
+    local b1 = ct:ac('b1')
+    local b2 = ct:ac('b2')
+    local b3 = ct:ac('b3')
+    local x, y, w, h
+    x, y, w, h = unpack(b1:bbox())
+    assert(x == 40)
+    assert(y == 10)
+    assert(w == 150)
+    assert(h == 60)
   end
  },
+ isolate = 'test_complex_1',
+ --isolate = nil,
  init = function(self)
   self._tests = {}
   for n, f in pairs(self.tests) do
@@ -364,6 +497,24 @@ local testRunner = {
 }
 -- TODO: Boomkark ?
 -- Initialize tests -----------------
+local scr = B:n('scr', 240, 137)
+scr.bgc = 2
+scr.brc = 5
+scr.b = F:n(10, 10, 10, 10)
+
+local pnl = scr:ac('pnl', 30, FL)
+pnl.bgc = 2
+
+local ctx = scr:ac('ctx')
+pnl.d = V
+pnl.bgc = 14
+
+local btn1 = ctx:ac('btn1')
+btn1.m = F:n(0, 10, 0, 0)
+btn1.bgc = 14
+
+local btn2 = ctx:ac('btn2')
+btn2.bgc = 13
 
 local READY = false
 testRunner:init()
@@ -375,7 +526,10 @@ function TIC()
   return
  end
  cls()
- print("HELLO WORLD!",84,84)
+ -- scr:render()
+ if btnp(4) then
+   pnl.w = pnl.w + 1
+ end
 end
 
 -- <TILES>
