@@ -6,27 +6,13 @@
 -- version: 0.1
 -- script:  lua
 
-min = math.min
-unpack = table.unpack
+local min = math.min
+local unpack = table.unpack
 
 local H = 'H' --..Horizontal
 local V = 'V' --..Vertical
 local FX = 'FX' --Fixed Size
 local FL = 'FL' --Auto Fill 
-
-
-local function merge(a, b)--b:n arvot overridaa a:n
-  local r = {}
-	for k,v in pairs(b) do
-    if (
-      type(v)=='table'
-    ) and(
-        type(a[k] or false) == table -- ???
-    ) then merge(a[k],b[k])
-    else a[k]=v
-  end end
-	return a
-end
 
 
 -- Frame class ----------------------
@@ -88,9 +74,9 @@ function B:n(n, w, h, m, b, p, pt, d)
   chn = {}, --..... Chilren
   chni= {}, --..... Children indexes
   bgr = nil, --.... Background render
-  fgr = nil, --..... Foreground render
-  brc = nil, -- .... Border color
-  bgc = nil, -- .... Background color
+  fgr = nil, --.... Foreground render
+  brc = nil, -- ... Border color
+  bgc = nil, -- ... Background color
  }, B)
 end
 
@@ -182,8 +168,9 @@ function B:gs(a)
  elseif sm == FL then
   assert(self.pt ~= nil)
   local as = self:gas(a)
-  trace('available space '..a..' is: '..as)
-  if self.pt.d ~= a then return as end
+  if self.pt.d ~= a then
+   return as
+  end
   local nos = 0 -- num of shares
   for i=1, #self.pt.chni do
    local c = self.pt.chni[i]
@@ -204,7 +191,6 @@ function B:gis(a, l)
   local m = ms[i] -- Method
   local f = self[m] -- Frame
   r = r - f:w(a)
-  print(r)
  end
  return r
 end
@@ -253,7 +239,6 @@ function B:bbox(l)
  local pos = self:pos()
  local x = pos['x']
  local y = pos['y']
- trace('calculating w of' .. self.n)
  local w = self:gs(H)
  local h = self:gs(V)
  for i=1, min(l, #ms) do
@@ -280,7 +265,7 @@ function B:render()
     -- print(w, x + 2, y + 2)
   end
   x, y, w, h = unpack(self:bbox(0))
-  -- rectb(x, y, w, h, 3)
+  rectb(x, y, w, h, 3)
   print(self.n, x + 2, y + 2)
   for i=1, #self.chni do
     self.chni[i]:render()
@@ -432,32 +417,33 @@ local testRunner = {
     assert(h == 40)
   end,
   test_complex_1 = function()
+    local x, y, w, h
     local m = F:n(10, 10, 10, 10)
     local pt = B:n('pt', 200, 200)
-    local pn = pt:ac('pn', 30, FL)
+    pt:ac('pn', 30, FL)
     local ct = pt:ac('ct', FL, FL, m)
-    x, y, w, h = unpack(ct:bbox(1))
+    ct.d = V
+    local b1 = ct:ac('b1')
+    x, y, w, h = unpack(b1:bbox())
     assert(x == 40)
     assert(y == 10)
     assert(w == 150)
     assert(h == 180)
-    local cti = ct:ac('cti')
-    x, y, w, h = unpack(cti:bbox(1))
+    local b2 = b1:as('b2')
+    x, y, w, h = unpack(b1:bbox())
     assert(x == 40)
     assert(y == 10)
     assert(w == 150)
-    assert(h == 180)
-    local cti2 = ct:ac('cti2')
-    x, y, w, h = unpack(cti:bbox(1))
+    assert(h == 90)
+    x, y, w, h = unpack(b2:bbox())
     assert(x == 40)
-    assert(y == 10)
-    trace(w)
+    assert(y == 100) -- 90 + 10
     assert(w == 150)
-    assert(h == 180)
+    assert(h == 90)
   end
  },
- isolate = 'test_complex_1',
- --isolate = nil,
+ --isolate = 'test_complex_1',
+ isolate = nil,
  init = function(self)
   self._tests = {}
   for n, f in pairs(self.tests) do
@@ -501,28 +487,24 @@ local testRunner = {
 }
 -- TODO: Boomkark ?
 -- Initialize tests -----------------
-local scr = B:n('scr', 240, 137)
+local scr = B:n('scr', 240, 136, {10, 10, 10, 10})
 scr.bgc = 2
 scr.brc = 5
-scr.b = F:n(10, 10, 10, 10)
+scr.d = H
 
-local pnl = scr:ac('pnl', 30, FL)
-pnl.bgc = 2
+local foo = scr:ac('foo', FL, FL, {10, 10, 10, 10})
+foo.bgc = 4
+foo.brc = 6
 
-local ctx = scr:ac('ctx')
-pnl.d = V
-pnl.bgc = 14
+local bar = scr:ac('bar', FL, FL, {10, 10, 10, 10})
+bar.bgc = 7
+bar.brc = 8
 
-local btn1 = ctx:ac('btn1')
-btn1.m = F:n(0, 10, 0, 0)
-btn1.bgc = 14
-
-local btn2 = ctx:ac('btn2')
-btn2.bgc = 13
+local zoo = bar:ac('zoo')
 
 local READY = false
 testRunner:init()
-screen = B:n('screen', 240, 139)
+
 
 function TIC()
  if READY == false then
@@ -530,7 +512,7 @@ function TIC()
   return
  end
  cls()
- -- scr:render()
+ scr:render()
  if btnp(4) then
    pnl.w = pnl.w + 1
  end
