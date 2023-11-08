@@ -13,7 +13,11 @@ local H = 'H' --..Horizontal
 local V = 'V' --..Vertical
 local FX = 'FX' --Fixed Size
 local FL = 'FL' --Auto Fill 
-
+local FTS = { -- Frame Types
+  'm', 'b', 'p'
+}
+local NOFTS = #FTS -- Number of frame
+                   -- Types
 
 -- Frame class ----------------------
 -- Define the class table
@@ -186,63 +190,67 @@ function B:gis(a, l)
  -- Get inner size.
  l  = l or 0
  local r = self:gs(a)
- local ms = {'m', 'b', 'p'}
- for i=1, min(#ms, l) do
-  local m = ms[i] -- Method
-  local f = self[m] -- Frame
+ for i=1, min(NOFTS, l) do
+  local ft = FTS[i] -- Method
+  local f = self[ft] -- Frame
   r = r - f:w(a)
  end
  return r
 end
 
-function B:pos()
- -- Build bounding box
- -- Only parent must call this.
-
- if not self.pt then
-    return {['x']= 0, ['y']= 0}
- end
- local r = self.pt:pos()
-
- local ms = {'m', 'b', 'p'}
- local p = self.pt
+function B:_p_offset()
+  -- Offset from parent.
+ local r = {['x'] = 0, ['y'] = 0}
+ local pt = self.pt
+ if not pt then return r end
  -- Get inner position of parent.
  repeat
- 	for i=1, #ms do
-   local f = p[ms[i]]
+  for i=1, NOFTS do
+   local f = pt[FTS[i]]
    r['x'] = r['x'] + f[4]
    r['y'] = r['y'] + f[1]
   end
-  p = p.pt
- until(p == nil)
+  pt = pt.pt
+ until(pt== nil)
+ return r
+end
 
- -- Add push from previous siblings
+function B:_s_offset()
+ local r = {['x'] = 0, ['y'] = 0}
+ if not self.pt then return r end
  local pss = self:ps()
-
- -- TODO: This can be shorter imo.
  local k
-	if self.pt.d == H then k = 'x'
-	elseif self.pt.d == V then k = 'y'
-	else error('WTF') end
+
+ if self.pt.d == H then k = 'x'
+ elseif self.pt.d == V then k = 'y'
+ else error('WTF') end
 
  for i=1, #pss do
  	local ps = pss[i]
   r[k] = r[k] + ps:gs(self.pt.d)
+  trace(r[k])
  end
-
  return r
+end
+
+function B:pos()
+ local po = self:_p_offset()
+ local so = self:_s_offset()
+ return {
+    ['x'] = po['x'] + so['x'],
+    ['y'] = po['y'] + so['y']
+  }
 end
 
 function B:bbox(l)
  l = l or 0
- local ms = {'m', 'b', 'p'}
  local pos = self:pos()
  local x = pos['x']
  local y = pos['y']
  local w = self:gs(H)
  local h = self:gs(V)
- for i=1, min(l, #ms) do
-  local f = self[ms[i]] -- Frame
+ for i=1, min(l, NOFTS) do
+  local f = self[FTS[i]] -- Frame
   x = x + f[4]
   y = y + f[1]
   w = w - f:w(H)
@@ -487,35 +495,29 @@ local testRunner = {
 }
 -- TODO: Boomkark ?
 -- Initialize tests -----------------
-local scr = B:n('scr', 240, 136, {10, 10, 10, 10})
-scr.bgc = 2
-scr.brc = 5
+local m = F:n(10, 10, 10, 10)
+local scr = B:n('scr', 100, 100, m, nil, nil)
 scr.d = H
+local c1 = scr:ac('c1')
+local c2 = scr:ac('c2')
+local c3 = scr:ac('c3')
+c3.d = V
+local c4 = c3:ac('c4')
+local c5 = c3:ac('c5')
 
-local foo = scr:ac('foo', FL, FL, {10, 10, 10, 10})
-foo.bgc = 4
-foo.brc = 6
-
-local bar = scr:ac('bar', FL, FL, {10, 10, 10, 10})
-bar.bgc = 7
-bar.brc = 8
-
-local zoo = bar:ac('zoo')
-
-local READY = false
+local READY = true
 testRunner:init()
-
-
+t = 0
 function TIC()
  if READY == false then
   READY = testRunner:tic() == 'COMPLETED'
   return
  end
  cls()
+ scr.w = (math.sin(t / 100) * 50) + 180
+ scr.h = (math.sin(t / 70) * 35) + 100
  scr:render()
- if btnp(4) then
-   pnl.w = pnl.w + 1
- end
+ t = t + 1
 end
 
 -- <TILES>
