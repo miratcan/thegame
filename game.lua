@@ -199,19 +199,19 @@ function B:gis(a, l)
 end
 
 function B:_p_offset()
-  -- Offset from parent.
- local r = {['x'] = 0, ['y'] = 0}
  local pt = self.pt
- if not pt then return r end
- -- Get inner position of parent.
- repeat
+ if not pt then
+  return {['x'] = 0, ['y'] = 0}
+ end
+ local r = pt:pos()
+ while (pt) do
   for i=1, NOFTS do
    local f = pt[FTS[i]]
    r['x'] = r['x'] + f[4]
    r['y'] = r['y'] + f[1]
   end
   pt = pt.pt
- until(pt== nil)
+ end
  return r
 end
 
@@ -228,7 +228,6 @@ function B:_s_offset()
  for i=1, #pss do
  	local ps = pss[i]
   r[k] = r[k] + ps:gs(self.pt.d)
-  trace(r[k])
  end
  return r
 end
@@ -236,6 +235,15 @@ end
 function B:pos()
  local po = self:_p_offset()
  local so = self:_s_offset()
+ if self.n == 'c3' then
+  local ppos = self.pt:pos()
+  assert(ppos['x'] == 120)
+  assert(po['x'] == 120)
+  assert(ppos['y'] == 10)
+  assert(so['y'] == 0)
+  assert(so['x'] == 0)
+  trace(po['x'] + so['x'])
+ end
  return {
     ['x'] = po['x'] + so['x'],
     ['y'] = po['y'] + so['y']
@@ -263,18 +271,19 @@ function B:render()
   local x, y, w, h
   -- Border bounding box
   if self.brc then
-    x, y, w, h = unpack(self:bbox(1))
+    x, y, w, h = unpack(self:bbox(2))
     rect(x, y, w, h, self.brc)
     -- print(w, x + 2, y + 2)
   end
   if self.bgc then
-    x, y, w, h = unpack(self:bbox(2))
+    x, y, w, h = unpack(self:bbox(1))
     rect(x, y, w, h, self.bgc)
     -- print(w, x + 2, y + 2)
   end
-  x, y, w, h = unpack(self:bbox(0))
+  x, y, w, h = unpack(self:bbox())
   rectb(x, y, w, h, 3)
   print(self.n, x + 2, y + 2)
+  print(x..':'.. y, x + 2, y + 10)
   for i=1, #self.chni do
     self.chni[i]:render()
   end
@@ -496,14 +505,12 @@ local testRunner = {
 -- TODO: Boomkark ?
 -- Initialize tests -----------------
 local m = F:n(10, 10, 10, 10)
-local scr = B:n('scr', 100, 100, m, nil, nil)
+local scr = B:n('scr', 240, 120, m, nil, nil)
 scr.d = H
-local c1 = scr:ac('c1')
-local c2 = scr:ac('c2')
-local c3 = scr:ac('c3')
-c3.d = V
-local c4 = c3:ac('c4')
-local c5 = c3:ac('c5')
+scr:ac('c1')
+local c2 = scr:ac('c2', FL, FL)
+c2.d = V
+c2:ac('c3')
 
 local READY = true
 testRunner:init()
@@ -514,8 +521,6 @@ function TIC()
   return
  end
  cls()
- scr.w = (math.sin(t / 100) * 50) + 180
- scr.h = (math.sin(t / 70) * 35) + 100
  scr:render()
  t = t + 1
 end
