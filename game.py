@@ -2,7 +2,7 @@
 # author:  game developers, email, etc.
 # desc:    short description
 # site:    website link
-# license: MIT License (change this to your license of choice)
+# license: MIT License
 # version: 0.1
 # script:  python
 
@@ -13,18 +13,19 @@ rect = globals()['rect']
 spr = globals()['spr']
 clip = globals()['clip']
 cls = globals()['cls']
-W          = 240
-H          = 136
-CX         = 120
-CY         = 68
-CW         = 6
-CH         = 4
+
+fc         = 0   # Frame counter
+SW         = 240 # Screen width
+SH         = 136 # Screen height
+CX         = 120 # Screen center x
+CY         = 68  # Screen center y
+CW         = 6   # Character width
+CH         = 4   # Character height
 APP_STATES = [
- 'MENU',   # 0
- 'INGAME', # 1
- 'GMOVER', # 2
+ 'MENU',         # 0
+ 'INGAME',       # 1
+ 'GMOVER',       # 2
 ]
-f          = 0
 
 astate_ttf = 60
 astate_tcf = 0
@@ -40,18 +41,26 @@ gstate_c   = {
 gstate_n   = gstate_c.copy()
 
 chars = {
- 'kenan': {'sid': 17}
+ 'kenan': {
+  'sid': 17,
+  'nm': 'General Kenan'
+ },
+ 'eren': {
+  'sid': 21,
+  'nm': 'Eren'
+ }
 }
 
 card_bps = {
  'kenan': {
-  'char': 'kenan',
-  'text': 'Hello World'
+  'char': 'eren',
+  'text': 'Oyuna Hosgeldin'
  }
 }
 
-def gen_card(bpk, x, y, tx=None,ty=None):
- global f
+def card_factory(bpk, x, y, tx=None,
+                 ty=None):
+ global fc
  bp = card_bps[bpk]
  char = chars[bp['char']]
  return {
@@ -59,43 +68,42 @@ def gen_card(bpk, x, y, tx=None,ty=None):
   'text': bp['text'],
   'x': x, 'y': y,
   'ts': [{
-   'sx': x,
-   'sy': y,
-   'tx': tx or x,
-   'ty': ty or y,
-   'sf': f,
-   'tf': f+60 if tx else None
+   'sx': x, 'sy': y,
+   'tx': tx or x, 'ty': ty or y,
+   'sf': fc, 'tf': fc+60 if tx else None
   }]
  }
 
-def card_process_transition(card):
- global f
+def card_transition_processer(card):
+ global fc
  if not card['ts']: return
  ts = card['ts'][0] # Transition
  tf = ts['tf'] # Target Frame
- if not tf or f > tf:
+ if not tf or fc > tf:
   card['ts'].pop()
   return
  sf = ts['sf'] # Start frame
  ft = tf - sf # Total frames
- cr = ease((f-sf)/ft) # Complete ratio
+ cr = ease((fc-sf)/ft) # Complete ratio
  vx, vy = (ts['tx']-ts['sx'],
            ts['ty']-ts['sy'])
+ trace((vx, vy))
  nx, ny = norm(vx, vy)
+ trace((nx, ny))
  card['x'] = ts['sx'] + (nx * cr) * vx
  card['y'] = ts['sy'] + (ny * cr) * vy
- trace(card['x'])
 
-card_c = gen_card('kenan', 60, -72, 60, 40)
+
+card_c = card_factory(
+ 'kenan', 2, SH, 2, 16)
 
 # Renderer functions ------------------
 
 def void_r():
- rect(0,0,W,H,0)
- print('void',CX,CY)
+ rect(0,0,SW,SH,0)
 
 def menu_r():
- rect(0,0,W,H,4)
+ rect(0,0,W,SH,4)
  print('menu',CX,CY)
 
 def _stat_frame_r(fx,fy,fw,fh):
@@ -121,7 +129,7 @@ def stat_r(title,gskey,slot,pad=2):
 
 def card_r(card):
  x,y=int(card['x']), int(card['y'])
- w,h=6,8
+ w,h=16,10
  for xi in range(w):
   for yi in range(h):
    s=9
@@ -138,8 +146,8 @@ def card_r(card):
     elif xi==w-1:s=8
    sx,sy=x+(xi*8),y+(yi*8)
    spr(s,sx,sy,0)
- spr(card['sid'],x+8,y+8,9,1,0,0,4,4)
- print((x, y), x, y)
+ spr(card['sid'],x,y+8,9,1,0,0,4,4)
+ print(card['text'],x+32, y+8, 15,False,1,False,False)
 
 def ingame_r():
  cls(7)
@@ -148,7 +156,7 @@ def ingame_r():
  stat_r('DICTA',   'army',   1)
  stat_r('ARMY',    'army',   2)
  stat_r('RELIGION','army',   3)
- card_process_transition(card_c)
+ card_transition_processer(card_c)
  card_r(card_c)
 
 def norm(x, y):
@@ -166,16 +174,16 @@ def transition_r():
  global W, H,astate_tcf,astate_ttf,\
   astate_c,astate_n
  e = ease(astate_tcf/astate_ttf)
- x = int(e * W)
- clip(0,0,x,H)
+ x = int(e*SW)
+ clip(0,0,x,SH)
  astate_r(astate_n)
- clip(x,0,W-x,H)
+ clip(x,0,SW-x,SH)
  astate_r(astate_c)
  astate_tcf+=1
  if astate_tcf>=astate_ttf:
   astate_c=astate_n
   astate_n=None
-  clip(0,0,W,H)
+  clip(0,0,SW,SH)
 
 def astate_r(astate):
  if not astate:
@@ -183,13 +191,13 @@ def astate_r(astate):
  [menu_r,ingame_r][astate]()
 
 def TIC():
- global astate_c, astate_n, f,\
+ global astate_c, astate_n, fc,\
   astate_c,astate_n,astate_ttf,\
   astate_tcf,CX,CY
  if astate_tcf<astate_ttf:
   transition_r()
  astate_r(astate_c)
- f+=1
+ fc+=1
 
 # <TILES>
 # 001:000fffff00fddddd0fdcccccfdccccccfdccccccfdccccccfdccccccfdcccccc
