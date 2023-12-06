@@ -1,9 +1,0 @@
-text: You have to keep four properties in balance. First of them is health.
-left:
-  label: That's enough, let's start.
-  emit:
-    - set_next_card: [['start'], {}]
-right:
-  label: Tell me more.
-  emit:
-    - set_next_card: [['teach_3'], {}]
